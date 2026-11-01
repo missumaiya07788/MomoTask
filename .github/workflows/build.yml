@@ -77,3 +77,4 @@ jobs:
         run: |
           echo "Android app files:"
           ls -la android/app/
+          cat android/app/build.gradle.kts
