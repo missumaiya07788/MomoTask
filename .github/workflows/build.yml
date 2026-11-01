@@ -79,10 +79,6 @@ jobs:
               )
 
           code = code.replace(
-              'namespace = "com.sumaiya.momotask.momotask"',
-              'namespace = "com.sumaiya.momotask"'
-          )
-          code = code.replace(
               'applicationId = "com.sumaiya.momotask.momotask"',
               'applicationId = "com.sumaiya.momotask"'
           )
