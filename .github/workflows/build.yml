@@ -1,0 +1,49 @@
+name: MOMOTASK Android Setup
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Extract Flutter project
+        run: |
+          mkdir -p /tmp/momotask_source
+          unzip -q MOMOTASK_Flutter_Prototype.zip -d /tmp/momotask_source
+          PUBSPEC=$(find /tmp/momotask_source -name pubspec.yaml -print -quit)
+          if [ -z "$PUBSPEC" ]; then
+            echo "pubspec.yaml was not found in the ZIP file."
+            exit 1
+          fi
+          SOURCE_DIR=$(dirname "$PUBSPEC")
+          cp -R "$SOURCE_DIR"/. .
+
+      - name: Generate Android project
+        run: |
+          flutter create --platforms=android --org com.sumaiya.momotask --project-name momotask .
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check Flutter code
+        run: flutter analyze
