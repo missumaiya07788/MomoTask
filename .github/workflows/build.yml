@@ -72,3 +72,8 @@ jobs:
 
       - name: Check Flutter code
         run: flutter analyze --no-fatal-infos
+
+      - name: Check Android files
+        run: |
+          echo "Android app files:"
+          ls -la android/app/
