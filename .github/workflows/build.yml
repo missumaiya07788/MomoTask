@@ -78,3 +78,5 @@ jobs:
           echo "Android app files:"
           ls -la android/app/
           cat android/app/build.gradle.kts
+          echo "ANDROID SETTINGS:"
+          cat android/settings.gradle.kts
