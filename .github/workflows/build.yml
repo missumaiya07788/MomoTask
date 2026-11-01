@@ -41,8 +41,7 @@ jobs:
       - name: Generate Android project
         run: |
           flutter create --platforms=android --org com.sumaiya.momotask --project-name momotask .
-      background: 
-      
+    
       - name: Add Firebase configuration files
         run: |
           mkdir -p android/app/src/admin
