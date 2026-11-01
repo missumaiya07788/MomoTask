@@ -1,4 +1,4 @@
-name: MOMOTASK Android Setup
+name: MOMOTASK Android Build
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  prepare:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +32,7 @@ jobs:
           unzip -q MOMOTASK_Flutter_Prototype.zip -d /tmp/momotask_source
           PUBSPEC=$(find /tmp/momotask_source -name pubspec.yaml -print -quit)
           if [ -z "$PUBSPEC" ]; then
-            echo "pubspec.yaml was not found in the ZIP file."
+            echo "pubspec.yaml not found"
             exit 1
           fi
           SOURCE_DIR=$(dirname "$PUBSPEC")
@@ -41,15 +41,75 @@ jobs:
       - name: Generate Android project
         run: |
           flutter create --platforms=android --org com.sumaiya.momotask --project-name momotask .
-    
+
       - name: Add Firebase configuration files
         run: |
           mkdir -p android/app/src/admin
           mkdir -p android/app/src/student
           cp google-services.json android/app/src/admin/google-services.json
           cp google-services-student.json android/app/src/student/google-services.json
-   
-      - name: Fix Flutter code issues
+
+      - name: Configure Android flavors and Firebase
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          settings = Path("android/settings.gradle.kts")
+          code = settings.read_text()
+          marker = 'id("org.jetbrains.kotlin.android") version "2.4.0" apply false'
+          if 'com.google.gms.google-services' not in code:
+              if marker not in code:
+                  raise SystemExit("Kotlin plugin line not found in settings.gradle.kts")
+              code = code.replace(
+                  marker,
+                  marker + '\n    id("com.google.gms.google-services") version "4.4.2" apply false'
+              )
+          settings.write_text(code)
+
+          app = Path("android/app/build.gradle.kts")
+          code = app.read_text()
+
+          if 'id("com.google.gms.google-services")' not in code:
+              marker = 'id("dev.flutter.flutter-gradle-plugin")'
+              if marker not in code:
+                  raise SystemExit("Flutter Gradle plugin line not found")
+              code = code.replace(
+                  marker,
+                  marker + '\n    id("com.google.gms.google-services")'
+              )
+
+          code = code.replace(
+              'namespace = "com.sumaiya.momotask.momotask"',
+              'namespace = "com.sumaiya.momotask"'
+          )
+          code = code.replace(
+              'applicationId = "com.sumaiya.momotask.momotask"',
+              'applicationId = "com.sumaiya.momotask"'
+          )
+
+          if "productFlavors {" not in code:
+              marker = "    buildTypes {"
+              flavors = '''    flavorDimensions += "role"
+
+              productFlavors {
+                  create("admin") {
+                      dimension = "role"
+                      applicationId = "com.sumaiya.momotask.admin"
+                  }
+                  create("student") {
+                      dimension = "role"
+                      applicationId = "com.sumaiya.momotask.student"
+                  }
+              }
+
+          '''
+              if marker not in code:
+                  raise SystemExit("buildTypes block not found")
+              code = code.replace(marker, flavors + marker)
+
+          app.write_text(code)
+          PY
+      - name: Fix Flutter code compatibility
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -73,10 +133,15 @@ jobs:
       - name: Check Flutter code
         run: flutter analyze --no-fatal-infos
 
-      - name: Check Android files
-        run: |
-          echo "Android app files:"
-          ls -la android/app/
-          cat android/app/build.gradle.kts
-          echo "ANDROID SETTINGS:"
-          cat android/settings.gradle.kts
+      - name: Build Admin APK
+        run: flutter build apk --release --flavor admin
+
+      - name: Build Student APK
+        run: flutter build apk --release --flavor student
+
+      - name: Upload APK files
+        uses: actions/upload-artifact@v4
+        with:
+          name: MOMOTASK-APKs
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
