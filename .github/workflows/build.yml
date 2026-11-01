@@ -41,7 +41,15 @@ jobs:
       - name: Generate Android project
         run: |
           flutter create --platforms=android --org com.sumaiya.momotask --project-name momotask .
-
+      background: 
+      
+      - name: Add Firebase configuration files
+        run: |
+          mkdir -p android/app/src/admin
+          mkdir -p android/app/src/student
+          cp google-services.json android/app/src/admin/google-services.json
+          cp google-services-student.json android/app/src/student/google-services.json
+   
       - name: Fix Flutter code issues
         run: |
           python3 - <<'PY'
