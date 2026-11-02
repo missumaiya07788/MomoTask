@@ -30,11 +30,14 @@ jobs:
         run: |
           mkdir -p /tmp/momotask_source
           unzip -q MOMOTASK_Flutter_Prototype.zip -d /tmp/momotask_source
+
           PUBSPEC=$(find /tmp/momotask_source -name pubspec.yaml -print -quit)
+
           if [ -z "$PUBSPEC" ]; then
             echo "pubspec.yaml not found"
             exit 1
           fi
+
           SOURCE_DIR=$(dirname "$PUBSPEC")
           cp -R "$SOURCE_DIR"/. .
 
@@ -44,12 +47,67 @@ jobs:
 
       - name: Apply Student Launcher Icon
         run: |
-          bash scripts/apply_student_launcher_icon.sh
+          set -e
+
+          STUDENT_RES="android/app/src/student/res"
+          ICON_SRC="assets/icon/generated"
+
+          if [ ! -d "android/app" ]; then
+            echo "Android project not found"
+            exit 1
+          fi
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            if [ ! -f "$ICON_SRC/$density/ic_launcher.png" ]; then
+              echo "Missing Student icon: $ICON_SRC/$density/ic_launcher.png"
+              exit 1
+            fi
+          done
+
+          if [ ! -f "$ICON_SRC/ic_launcher_foreground.png" ]; then
+            echo "Student foreground icon not found"
+            exit 1
+          fi
+
+          mkdir -p "$STUDENT_RES/mipmap-mdpi"
+          mkdir -p "$STUDENT_RES/mipmap-hdpi"
+          mkdir -p "$STUDENT_RES/mipmap-xhdpi"
+          mkdir -p "$STUDENT_RES/mipmap-xxhdpi"
+          mkdir -p "$STUDENT_RES/mipmap-xxxhdpi"
+          mkdir -p "$STUDENT_RES/mipmap-anydpi-v26"
+          mkdir -p "$STUDENT_RES/drawable"
+          mkdir -p "$STUDENT_RES/values"
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp "$ICON_SRC/$density/ic_launcher.png" \
+              "$STUDENT_RES/mipmap-$density/ic_launcher.png"
+          done
+
+          cp "$ICON_SRC/ic_launcher_foreground.png" \
+            "$STUDENT_RES/drawable/ic_launcher_foreground.png"
+
+          cat > "$STUDENT_RES/mipmap-anydpi-v26/ic_launcher.xml" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/momotask_student_icon_background" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          XML
+
+          cat > "$STUDENT_RES/values/ic_launcher_background.xml" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="momotask_student_icon_background">#392477</color>
+          </resources>
+          XML
+
+          echo "Student launcher icon applied successfully"
 
       - name: Add Firebase configuration files
         run: |
           mkdir -p android/app/src/admin
           mkdir -p android/app/src/student
+
           cp google-services.json android/app/src/admin/google-services.json
           cp google-services-student.json android/app/src/student/google-services.json
 
@@ -60,14 +118,18 @@ jobs:
 
           settings = Path("android/settings.gradle.kts")
           code = settings.read_text()
+
           marker = 'id("org.jetbrains.kotlin.android") version "2.4.0" apply false'
+
           if 'com.google.gms.google-services' not in code:
               if marker not in code:
                   raise SystemExit("Kotlin plugin line not found in settings.gradle.kts")
+
               code = code.replace(
                   marker,
                   marker + '\n    id("com.google.gms.google-services") version "4.4.2" apply false'
               )
+
           settings.write_text(code)
 
           app = Path("android/app/build.gradle.kts")
@@ -75,8 +137,10 @@ jobs:
 
           if 'id("com.google.gms.google-services")' not in code:
               marker = 'id("dev.flutter.flutter-gradle-plugin")'
+
               if marker not in code:
                   raise SystemExit("Flutter Gradle plugin line not found")
+
               code = code.replace(
                   marker,
                   marker + '\n    id("com.google.gms.google-services")'
@@ -89,6 +153,7 @@ jobs:
 
           if "productFlavors {" not in code:
               marker = "    buildTypes {"
+
               flavors = '''    flavorDimensions += "role"
 
               productFlavors {
@@ -103,8 +168,10 @@ jobs:
               }
 
           '''
+
               if marker not in code:
                   raise SystemExit("buildTypes block not found")
+
               code = code.replace(marker, flavors + marker)
 
           app.write_text(code)
@@ -116,12 +183,17 @@ jobs:
           from pathlib import Path
 
           main = Path("lib/main.dart")
+
           if main.exists():
               code = main.read_text()
-              code = code.replace("cardTheme: CardTheme(", "cardTheme: CardThemeData(")
+              code = code.replace(
+                  "cardTheme: CardTheme(",
+                  "cardTheme: CardThemeData("
+              )
               main.write_text(code)
 
           test_file = Path("test/widget_test.dart")
+
           if test_file.exists():
               code = test_file.read_text()
               code = code.replace("MyApp", "MomoTaskApp")
